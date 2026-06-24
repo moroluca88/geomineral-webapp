@@ -1,0 +1,80 @@
+{
+  "entities": {
+    "Mineral": {
+      "title": "Mineral",
+      "description": "A mineral specimen in the collection",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique code for the mineral" },
+        "name": { "type": "string", "description": "Common name of the mineral" },
+        "photoUrl": { "type": "string", "description": "URL of the uploaded photo" },
+        "photos": { 
+          "type": "array", 
+          "items": { "type": "string" },
+          "description": "URLs of all uploaded photos" 
+        },
+        "origin": { "type": "string", "description": "Place of origin" },
+        "acquisitionMode": { 
+          "type": "string", 
+          "enum": ["acquisto", "ritrovamento", "scambio", "donazione"],
+          "description": "How the mineral was acquired"
+        },
+        "dimensions": { 
+          "type": "object",
+          "properties": {
+            "width": { "type": "number" },
+            "height": { "type": "number" },
+            "depth": { "type": "number" }
+          },
+          "required": ["width", "height", "depth"]
+        },
+        "coordinates": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" }
+          }
+        },
+        "normalizedId": { "type": "string", "description": "Normalized version of the unique code for uniqueness checks" },
+        "ownerId": { "type": "string", "description": "UID of the user who owns this mineral" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "acquisitionMode", "ownerId", "normalizedId"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile data",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] }
+      },
+      "required": ["uid", "email"]
+    },
+    "PublicProfile": {
+      "title": "PublicProfile",
+      "description": "Publicly accessible user info",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "firestore": {
+    "/minerals/{mineralDocId}": {
+      "schema": "Mineral",
+      "description": "Collection of minerals"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/public_profiles/{userId}": {
+      "schema": "PublicProfile",
+      "description": "Publicly accessible user profiles"
+    }
+  }
+}

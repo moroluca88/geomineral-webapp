@@ -1,0 +1,156 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: minerals
+// Document ID: auto-generated
+// Fields:
+//   - id: string (required, 1-50 chars) - Unique code
+//   - normalizedId: string (required, 1-50 chars) - Normalized unique code
+//   - name: string (required, 1-100 chars) - Mineral name
+//   - photoUrl: string (optional, URL) - Image URL
+//   - origin: string (required, 1-200 chars) - Origin location
+//   - acquisitionMode: string (required, enum) - How it was acquired
+//   - dimensions: map (optional) - {width, height, depth}
+//   - coordinates: map (optional) - {lat, lng}
+//   - ownerId: string (required) - UID of owner
+//   - createdAt: timestamp (required)
+//
+// Collection: users
+// Document ID: userId
+// Fields:
+//   - uid: string (required)
+//   - email: string (required, email format)
+//   - displayName: string (optional, 1-100 chars)
+//   - role: string (required, enum: user, admin)
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.ownerId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "moroluca88@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    function isRecent(time) {
+      return time is timestamp && 
+             time > request.time - duration.value(5, 'm') &&
+             time < request.time + duration.value(5, 'm');
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'role']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             data.role in ['user', 'admin'] &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 100));
+    }
+
+    function isValidMineral(data) {
+      // 1. Strict Schema Enforcement (No extraneous fields)
+      let allowedFields = ['id', 'normalizedId', 'name', 'origin', 'acquisitionMode', 'ownerId', 'createdAt', 'photoUrl', 'photos', 'dimensions', 'coordinates', 'notes'];
+      let requiredFields = ['id', 'normalizedId', 'name', 'origin', 'acquisitionMode', 'ownerId', 'createdAt'];
+      
+      return data.keys().hasAll(requiredFields) &&
+             data.keys().hasOnly(allowedFields) &&
+             
+             // 2. Type & Size Validation (Protect against DoS/Saturations)
+             data.id is string && data.id.size() > 0 && data.id.size() <= 32 &&
+             data.normalizedId is string && data.normalizedId.size() > 0 && data.normalizedId.size() <= 32 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 80 &&
+             data.origin is string && data.origin.size() <= 150 &&
+             data.acquisitionMode in ['acquisto', 'ritrovamento', 'scambio', 'donazione'] &&
+             data.ownerId == request.auth.uid &&
+             data.createdAt is timestamp &&
+             
+             // 3. Optional Fields Validation
+             (!('photoUrl' in data) || (data.photoUrl is string && data.photoUrl.size() <= 500)) &&
+             (!('photos' in data) || (data.photos is list && data.photos.size() <= 6)) &&
+             (!('dimensions' in data) || (data.dimensions is map)) &&
+             (!('coordinates' in data) || (data.coordinates == null || (data.coordinates is map && data.coordinates.keys().hasAll(['lat', 'lng'])))) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 1500));
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      // PII Protection: Only owner or admin can read
+      allow read: if isOwner(userId) || isAdmin();
+      
+      // Users can only create their own profile with 'user' role
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
+                      (request.resource.data.role == 'user' || isAdmin());
+      
+      // Users cannot change their own role unless they are already admin
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && 
+                      (request.resource.data.role == resource.data.role || isAdmin());
+
+      // Allow account deletion
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    match /public_profiles/{userId} {
+      // Publicly readable for collection sharing
+      allow read: if true;
+      // Only owner can write or delete their public profile
+      allow write: if isOwner(userId) && 
+                     (!('displayName' in request.resource.data) || (request.resource.data.displayName is string && request.resource.data.displayName.size() <= 100));
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    match /minerals/{document=**} {
+      // Accesso pubblico per link condivisi e QR code
+      allow read: if true;
+      
+      // Creazione: Solo utenti autenticati con dati validi
+      allow create: if isAuthenticated() && (isValidMineral(request.resource.data) || isAdmin());
+      
+      // Aggiornamento: Solo il proprietario o admin
+      allow update: if isAuthenticated() && (isDocOwner() || isAdmin()) && 
+                      (isAdmin() || (
+                        isValidMineral(request.resource.data) &&
+                        request.resource.data.id == resource.data.id &&
+                        request.resource.data.normalizedId == resource.data.normalizedId &&
+                        request.resource.data.ownerId == resource.data.ownerId &&
+                        request.resource.data.createdAt == resource.data.createdAt
+                      ));
+                      
+      // Eliminazione: Solo proprietario o admin
+      allow delete: if isAuthenticated() && (isDocOwner() || isAdmin());
+    }
+  }
+}

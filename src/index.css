@@ -1,0 +1,97 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Outfit", sans-serif;
+
+  --color-primary: #2d4a3e; /* Deep Forest Green */
+  --color-secondary: #8c7851; /* Muted Gold/Ochre */
+  --color-accent: #c25e3e; /* Terracotta */
+  --color-surface: #fdfbf7; /* Warm Off-white */
+}
+
+@layer base {
+  body {
+    @apply bg-surface text-stone-900 font-sans antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    @apply font-display;
+  }
+
+  img {
+    -ms-visual-search: hidden;
+  }
+
+  img[data-visual-search="false"] {
+    pointer-events: none;
+  }
+}
+
+@media print {
+  @page {
+    margin: 0;
+    size: auto;
+  }
+  body {
+    background: white !important;
+  }
+  body * {
+    visibility: hidden;
+  }
+  #printable-label, #printable-label * {
+    visibility: visible;
+  }
+  #printable-label {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    border: 1px solid #000 !important;
+    border-radius: 0 !important;
+    width: 60mm !important;
+    height: 80mm !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 5mm !important;
+    background: white !important;
+    z-index: 9999;
+  }
+}
+
+/* Leaflet Marker Cluster Custom Styles */
+.marker-cluster-small,
+.marker-cluster-medium,
+.marker-cluster-large {
+  background-color: rgba(45, 74, 62, 0.15) !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.marker-cluster-small div,
+.marker-cluster-medium div,
+.marker-cluster-large div {
+  background-color: rgba(45, 74, 62, 0.9) !important;
+  color: white !important;
+  font-family: var(--font-display) !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 2px solid white !important;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1) !important;
+  border-radius: 50% !important;
+  width: 32px !important;
+  height: 32px !important;
+  margin: 0 !important; /* Reset default margin */
+}
+
+.marker-cluster span {
+  line-height: 32px !important;
+}

@@ -1,0 +1,7 @@
+{
+  "name": "GeoMineral - Collezione Minerali",
+  "description": "A professional mineral collection management app with geological map integration, secure authentication, and advanced search filters.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
