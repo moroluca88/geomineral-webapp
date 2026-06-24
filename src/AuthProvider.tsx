@@ -38,9 +38,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (firebaseUser) {
           const userDocRef = doc(db, 'users', firebaseUser.uid);
           
-          // Initial sync logic (runs only once per login)
-          const userDocSnap = await getDoc(userDocRef);
-          const existingData = userDocSnap.exists() ? userDocSnap.data() : {};
+          let existingData: any = {};
+          try {
+            // Initial sync logic (runs only once per login)
+            const userDocSnap = await getDoc(userDocRef);
+            existingData = userDocSnap.exists() ? userDocSnap.data() : {};
+          } catch (getDocErr) {
+            console.warn('Could not fetch user doc (might be offline):', getDocErr);
+            // Try to load cached user details from localStorage
+            const cached = localStorage.getItem(`user_data_${firebaseUser.uid}`);
+            if (cached) {
+              try {
+                existingData = JSON.parse(cached);
+              } catch (_) {}
+            }
+          }
           
           const displayName = firebaseUser.displayName || 
                             existingData.displayName || 
@@ -54,13 +66,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             role: (existingData.role as string) || 'user'
           };
 
-          await setDoc(userDocRef, newUserData, { merge: true });
+          // Update local state and cache immediately so the app is responsive/functional
+          setUserData(newUserData);
+          localStorage.setItem(`user_data_${firebaseUser.uid}`, JSON.stringify(newUserData));
+
+          try {
+            await setDoc(userDocRef, newUserData, { merge: true });
+          } catch (setDocErr) {
+            console.warn('Could not sync user doc with server (might be offline):', setDocErr);
+          }
 
           // Listener for real-time updates
           unsubscribeSnap = onSnapshot(userDocRef, (snap) => {
             if (snap.exists()) {
-              setUserData(snap.data() as UserData);
+              const data = snap.data() as UserData;
+              setUserData(data);
+              localStorage.setItem(`user_data_${firebaseUser.uid}`, JSON.stringify(data));
             }
+          }, (snapErr) => {
+            console.warn('onSnapshot listener error (might be offline):', snapErr);
           });
 
           setUser(firebaseUser);
